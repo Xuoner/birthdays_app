@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Birthdays</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Birthdays">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f3f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14131b" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<style>
+/* Layout: one narrow column; a tear-off calendar page for the next birthday, then the year as a month-by-month list. */
+:root {
+  --bg: #f3f2f7;
+  --surface: #ffffff;
+  --ink: #1d1b2b;
+  --muted: #6b6880;
+  --line: #e2e0ea;
+  --red: #d63a50;        /* calendar band, accent */
+  --red-ink: #ffffff;
+  --candle: #f0b429;     /* today highlight */
+  --candle-soft: #fdf3d8;
+  --display: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+  --body: -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14131b; --surface: #1f1d2a; --ink: #eceaf5; --muted: #9a97ad; --line: #2e2b3d;
+    --red: #e4566b; --red-ink: #ffffff; --candle: #f5c451; --candle-soft: #3a3020;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14131b; --surface: #1f1d2a; --ink: #eceaf5; --muted: #9a97ad; --line: #2e2b3d;
+  --red: #e4566b; --red-ink: #ffffff; --candle: #f5c451; --candle-soft: #3a3020;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { -webkit-text-size-adjust: 100%; background: var(--bg); }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.4 var(--body);
+  padding: env(safe-area-inset-top, 0px) max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 32px) max(16px, env(safe-area-inset-left, 0px));
+  overscroll-behavior-y: none;
+}
+[hidden] { display: none !important; }
+.wrap { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; padding-block: 14px; }
+h1, h2 { text-wrap: balance; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; -webkit-user-select: none; user-select: none; }
+button:active { opacity: .6; }
+:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
+
+/* Header */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.top h1 { margin: 0; font: 800 2rem/1.1 var(--display); letter-spacing: -0.02em; }
+.top .count { color: var(--muted); font-size: .9rem; }
+.btn {
+  border: 0; border-radius: 999px; padding: 10px 18px; font-weight: 700;
+  background: var(--ink); color: var(--bg);
+}
+.btn.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--line); }
+.btn.red { background: var(--red); color: var(--red-ink); }
+.btn.small { padding: 7px 14px; font-size: .9rem; }
+.btn.text-red { color: var(--red); }
+
+/* Tear-off calendar page */
+.next { display: grid; grid-template-columns: 112px 1fr; gap: 18px; align-items: center; }
+.page {
+  background: var(--surface); border-radius: 14px; overflow: hidden; text-align: center; position: relative;
+  box-shadow: 0 1px 0 var(--line), 0 10px 24px -14px rgba(20, 10, 40, .35);
+}
+.page .band { background: var(--red); color: var(--red-ink); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; font-size: .78rem; padding: 7px 0 6px; }
+.page .num { font: 800 3.4rem/1 var(--display); padding: 10px 0 4px; font-variant-numeric: tabular-nums; }
+.page .wd { color: var(--muted); font-size: .78rem; padding-bottom: 10px; }
+.page::before, .page::after { content: ""; position: absolute; top: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--bg); }
+.page::before { left: 20px; } .page::after { right: 20px; }
+.next .who { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.eyebrow { font-size: .75rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.next .name { font: 800 1.65rem/1.1 var(--display); overflow-wrap: anywhere; }
+.next .meta { color: var(--muted); }
+.next.today .page .band { background: var(--candle); color: #2a1f00; }
+.next.today .eyebrow { color: var(--ink); }
+
+.notice { background: var(--candle-soft); border-radius: 12px; padding: 12px 14px; display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; font-size: .95rem; }
+
+.search { width: 100%; padding: 11px 14px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--surface); font-size: 16px; -webkit-appearance: none; appearance: none; }
+
+/* List */
+.months { display: flex; flex-direction: column; gap: 20px; }
+.month h2 { margin: 0 0 8px; font-size: .75rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 800; }
+.rows { background: var(--surface); border-radius: 14px; overflow: hidden; }
+.row {
+  width: 100%; display: grid; grid-template-columns: 38px 1fr auto; gap: 12px; align-items: center;
+  padding: 12px 14px; border: 0; background: none; text-align: left; border-top: 1px solid var(--line);
+}
+.row:first-child { border-top: 0; }
+.row .day { font: 800 1.35rem/1 var(--display); text-align: center; font-variant-numeric: tabular-nums; }
+.row .nm { min-width: 0; }
+.row .nm b { display: block; overflow-wrap: anywhere; }
+.row .nm span { color: var(--muted); font-size: .88rem; }
+.row .in { font-size: .85rem; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.row.is-today { background: var(--candle-soft); }
+.row.is-today .in { color: var(--ink); font-weight: 700; }
+.tag { display: inline-block; font-size: .68rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 0 5px; margin-left: 6px; vertical-align: 2px; }
+.tag.warn { color: var(--red); border-color: var(--red); }
+.empty { color: var(--muted); text-align: center; padding: 24px 8px; }
+
+/* Panels */
+.panel { background: var(--surface); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.panel h2 { margin: 0; font: 800 1.2rem/1.2 var(--display); }
+.panel p { margin: 0; color: var(--muted); font-size: .95rem; max-width: 62ch; }
+.panel .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.status { display: flex; gap: 10px; align-items: center; font-weight: 700; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: #2fa36b; flex: none; }
+.dot.off { background: var(--red); }
+
+/* Sheet (iOS-style page sheet) */
+.scrim { position: fixed; inset: 0; background: rgba(10, 8, 20, .45); z-index: 10; }
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 11; margin: 0 auto; max-width: 560px;
+  max-height: calc(100% - env(safe-area-inset-top, 0px) - 12px); overflow-y: auto; -webkit-overflow-scrolling: touch;
+  background: var(--surface); border-radius: 16px 16px 0 0;
+}
+.sheet-bar {
+  position: sticky; top: 0; background: var(--surface); z-index: 1;
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--line);
+}
+.sheet-bar h2 { margin: 0; font-size: 1.05rem; font-weight: 700; }
+.sheet-bar .link { border: 0; background: none; color: var(--red); font-size: 1.05rem; padding: 4px 0; }
+.sheet-bar .link:last-child { justify-self: end; font-weight: 700; }
+.sheet-bar .link:first-child { justify-self: start; }
+.sheet-body { padding: 18px 16px calc(env(safe-area-inset-bottom, 0px) + 20px); display: flex; flex-direction: column; gap: 18px; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field label, .field .lbl { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.field input {
+  width: 100%; padding: 11px 12px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--bg); font-size: 16px;
+  -webkit-appearance: none; appearance: none;
+}
+.chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.chip { padding: 9px 0; border-radius: 10px; border: 1.5px solid var(--line); background: none; font-weight: 600; }
+.chip[aria-pressed="true"] { background: var(--red); border-color: var(--red); color: var(--red-ink); }
+.pair { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; }
+.err { color: var(--red); font-size: .92rem; min-height: 1.2em; margin: 0; }
+.sheet .wide { width: 100%; padding: 13px; }
+.confirm { display: flex; flex-direction: column; gap: 10px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .sheet:not([hidden]) { animation: up .28s cubic-bezier(.2, .8, .2, 1); }
+  .scrim:not([hidden]) { animation: fade .2s ease-out; }
+  @keyframes up { from { transform: translateY(100%); } }
+  @keyframes fade { from { opacity: 0; } }
+}
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); transform: translateX(-50%); z-index: 20;
+  background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-weight: 700; font-size: .92rem;
+  max-width: calc(100% - 32px); text-align: center;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Birthdays</h1>
+      <div class="count" id="count"></div>
+    </div>
+    <button class="btn" id="addBtn" type="button">Add</button>
+  </header>
+
+  <section class="next" id="next" aria-live="polite"></section>
+
+  <div class="notice" id="exampleNotice" hidden>
+    <span>These three are examples. They disappear when you add your first birthday.</span>
+    <button class="btn ghost small" id="clearExamples" type="button">Remove now</button>
+  </div>
+
+  <input class="search" id="search" type="search" placeholder="Search names" autocomplete="off" aria-label="Search names">
+
+  <div class="months" id="months"></div>
+
+  <section class="panel">
+    <h2>Midnight reminders</h2>
+    <div class="status" id="remStatus"></div>
+    <p>Your iPhone Calendar sends the reminders: one all-day event per person, repeating every year, with an alert at 00:00.</p>
+    <div class="actions">
+      <button class="btn red" id="calMissing" type="button"></button>
+    </div>
+    <p>On the screen that opens, tap <b>Add All</b>. If nothing opens, open this app's link in Safari and try there.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Backup</h2>
+    <p>Your list is saved on this iPhone only. Save a backup file now and then, and restore it if you change phones.</p>
+    <div class="actions">
+      <button class="btn ghost" id="exportBtn" type="button">Save backup</button>
+      <label class="btn ghost" for="importFile">Restore backup</label>
+      <input id="importFile" type="file" accept="application/json,.json" hidden>
+    </div>
+  </section>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+
+<form class="sheet" id="sheet" hidden novalidate>
+  <div class="sheet-bar">
+    <button class="link" id="cancelBtn" type="button">Cancel</button>
+    <h2 id="sheetTitle">New birthday</h2>
+    <button class="link" id="barSave" type="submit">Save</button>
+  </div>
+  <div class="sheet-body" id="editBody">
+    <div class="field">
+      <label for="fName">Name</label>
+      <input id="fName" autocomplete="off" maxlength="80" placeholder="Who is it?" enterkeyhint="next">
+    </div>
+    <div class="field">
+      <span class="lbl" id="monthLbl">Month</span>
+      <div class="chips" id="chips" role="group" aria-labelledby="monthLbl"></div>
+    </div>
+    <div class="pair">
+      <div class="field">
+        <label for="fDay">Day</label>
+        <input id="fDay" inputmode="numeric" pattern="[0-9]*" maxlength="2" placeholder="1–31">
+      </div>
+      <div class="field">
+        <label for="fYear">Birth year (optional)</label>
+        <input id="fYear" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="e.g. 1994">
+      </div>
+    </div>
+    <div class="field">
+      <label for="fNote">Note</label>
+      <input id="fNote" autocomplete="off" maxlength="140" placeholder="Gift ideas, how you know them…">
+    </div>
+    <p class="err" id="fErr" role="alert"></p>
+    <button class="btn wide" type="submit">Save</button>
+    <div class="confirm" id="editExtras">
+      <button class="btn ghost wide" id="calOne" type="button">Add reminder to Calendar</button>
+      <button class="btn ghost wide text-red" id="delBtn" type="button">Delete</button>
+    </div>
+    <div class="confirm" id="confirmDel" hidden>
+      <p class="err" style="color:var(--ink)">Delete <b id="confirmName"></b>? If you added their reminder, delete it in Calendar too.</p>
+      <button class="btn red wide" id="confirmYes" type="button">Delete</button>
+      <button class="btn ghost wide" id="confirmNo" type="button">Keep</button>
+    </div>
+  </div>
+  <div class="sheet-body" id="addedBody" hidden>
+    <p style="margin:0;font-size:1.05rem">Saved <b id="addedName"></b>.</p>
+    <p style="margin:0;color:var(--muted)">Add their midnight reminder to your Calendar now? It repeats every year.</p>
+    <button class="btn red wide" id="addedCal" type="button">Add reminder to Calendar</button>
+    <button class="btn ghost wide" id="addedLater" type="button">Later</button>
+  </div>
+</form>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+"use strict";
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DAYS_IN = [31,29,31,30,31,30,31,31,30,31,30,31];
+const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const KEY = "birthday-book.v1";
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+/* ---------- storage ---------- */
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function examples() {
+  const t = new Date();
+  const plus = (n) => { const d = new Date(t.getFullYear(), t.getMonth(), t.getDate() + n); return { d: d.getDate(), m: d.getMonth() + 1 }; };
+  return [
+    { id: uid(), name: "Example: Léa", ...plus(3), y: 1996, note: "Likes jazz records", example: true },
+    { id: uid(), name: "Example: Grandpa Marcel", ...plus(41), y: 1948, note: "", example: true },
+    { id: uid(), name: "Example: Sam", ...plus(160), y: null, note: "", example: true },
+  ];
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) { const v = JSON.parse(raw); if (Array.isArray(v.people)) return v.people; }
+  } catch (e) {}
+  return examples();
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify({ people })); }
+  catch (e) { toast("Couldn't save on this phone. Check that private browsing is off."); }
+}
+let people = load();
+const real = () => people.filter(p => !p.example);
+
+/* ---------- date logic ---------- */
+const isLeap = (y) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+function startOfToday() { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
+function dateIn(p, year) {
+  // 29 Feb birthdays are celebrated on 28 Feb in non-leap years.
+  if (p.m === 2 && p.d === 29 && !isLeap(year)) return new Date(year, 1, 28);
+  return new Date(year, p.m - 1, p.d);
+}
+function nextOf(p, today) {
+  const d = dateIn(p, today.getFullYear());
+  return d < today ? dateIn(p, today.getFullYear() + 1) : d;
+}
+const daysBetween = (a, b) => Math.round((b - a) / 86400000);
+function enrich(today) {
+  return people.map(p => {
+    const next = nextOf(p, today);
+    return { ...p, next, days: daysBetween(today, next), turns: p.y ? next.getFullYear() - p.y : null };
+  }).sort((a, b) => a.days - b.days || a.name.localeCompare(b.name));
+}
+function whenText(days) {
+  if (days === 0) return "Today";
+  if (days === 1) return "Tomorrow";
+  if (days < 7) return `In ${days} days`;
+  if (days < 60) { const w = Math.round(days / 7); return w === 1 ? "In 1 week" : `In ${w} weeks`; }
+  return `In ${Math.round(days / 30.44)} months`;
+}
+
+/* ---------- render ---------- */
+function render() {
+  const today = startOfToday();
+  const list = enrich(today);
+  const q = $("search").value.trim().toLowerCase();
+  const n = real().length;
+  $("count").textContent = n === 0 ? "No birthdays yet" : `${n} ${n === 1 ? "person" : "people"}`;
+  $("exampleNotice").hidden = !people.some(p => p.example);
+
+  const nextEl = $("next");
+  if (!list.length) {
+    nextEl.className = "next";
+    nextEl.innerHTML = `<div class="page" aria-hidden="true"><div class="band">—</div><div class="num">?</div><div class="wd">&nbsp;</div></div>
+      <div class="who"><span class="eyebrow">Nothing yet</span><span class="name">Add your first birthday</span><span class="meta">Tap Add at the top.</span></div>`;
+  } else {
+    const first = list[0];
+    const same = list.filter(p => p.days === first.days);
+    const ages = same.length === 1 && first.turns ? `Turns ${first.turns}` : "";
+    nextEl.className = "next" + (first.days === 0 ? " today" : "");
+    nextEl.innerHTML = `<div class="page" aria-hidden="true"><div class="band">${MONTHS[first.next.getMonth()].slice(0, 3)}</div>
+        <div class="num">${first.next.getDate()}</div><div class="wd">${WEEKDAYS[first.next.getDay()]}</div></div>
+      <div class="who"><span class="eyebrow">${first.days === 0 ? "Today 🎂" : "Next up"}</span>
+        <span class="name">${same.map(p => esc(p.name)).join(" &amp; ")}</span>
+        <span class="meta">${[first.days === 0 ? "" : whenText(first.days), ages].filter(Boolean).join(" · ")}</span></div>`;
+  }
+
+  const shown = q ? list.filter(p => p.name.toLowerCase().includes(q) || (p.note || "").toLowerCase().includes(q)) : list;
+  const groups = new Map();
+  for (const p of shown) {
+    const key = p.next.getFullYear() * 12 + p.next.getMonth();
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(p);
+  }
+  $("months").innerHTML = !shown.length
+    ? `<div class="empty">${q ? "No one matches that search." : "Your birthdays will show here, month by month."}</div>`
+    : [...groups.entries()].map(([key, ps]) => {
+        const y = Math.floor(key / 12), m = key % 12;
+        return `<section class="month"><h2>${MONTHS[m]}${y !== today.getFullYear() ? " " + y : ""}</h2><div class="rows">${ps.map(p => `
+          <button class="row${p.days === 0 ? " is-today" : ""}" type="button" data-id="${esc(p.id)}">
+            <span class="day">${p.next.getDate()}</span>
+            <span class="nm"><b>${esc(p.name)}${p.example ? '<span class="tag">example</span>' : p.cal ? "" : '<span class="tag warn">no reminder</span>'}</b>
+              <span>${[p.turns ? `Turns ${p.turns}` : "", p.note ? esc(p.note) : ""].filter(Boolean).join(" · ") || "&nbsp;"}</span></span>
+            <span class="in">${whenText(p.days)}</span>
+          </button>`).join("")}</div></section>`;
+      }).join("");
+
+  // Reminder status
+  const missing = real().filter(p => !p.cal);
+  const st = $("remStatus");
+  if (!real().length) st.innerHTML = `<span class="dot off"></span>Add someone to set up reminders`;
+  else if (!missing.length) st.innerHTML = `<span class="dot"></span>Everyone has a reminder`;
+  else st.innerHTML = `<span class="dot off"></span>${missing.length} ${missing.length === 1 ? "person has" : "people have"} no reminder yet`;
+  $("calMissing").hidden = !missing.length;
+  $("calMissing").textContent = missing.length === 1 ? "Add 1 reminder to Calendar" : `Add ${missing.length} reminders to Calendar`;
+}
+
+/* ---------- sheet ---------- */
+let editingId = null, month = 1;
+$("chips").innerHTML = MONTHS.map((m, i) => `<button type="button" class="chip" data-m="${i + 1}" aria-pressed="false">${m.slice(0, 3)}</button>`).join("");
+function setMonth(m) {
+  month = m;
+  for (const c of $("chips").children) c.setAttribute("aria-pressed", String(+c.dataset.m === m));
+}
+$("chips").addEventListener("click", (e) => { const c = e.target.closest(".chip"); if (c) setMonth(+c.dataset.m); });
+
+function showSheet(mode) {
+  $("editBody").hidden = mode !== "edit";
+  $("addedBody").hidden = mode !== "added";
+  $("barSave").hidden = mode !== "edit";
+  $("cancelBtn").textContent = mode === "edit" ? "Cancel" : "Close";
+  $("sheet").hidden = false; $("scrim").hidden = false;
+  document.body.style.overflow = "hidden";
+}
+function closeSheet() {
+  $("sheet").hidden = true; $("scrim").hidden = true;
+  document.body.style.overflow = "";
+  document.activeElement && document.activeElement.blur && document.activeElement.blur();
+}
+function openEditor(id) {
+  editingId = id || null;
+  const p = id ? people.find(x => x.id === id) : null;
+  $("sheetTitle").textContent = p ? "Edit birthday" : "New birthday";
+  $("fName").value = p ? p.name : "";
+  $("fDay").value = p ? p.d : "";
+  setMonth(p ? p.m : new Date().getMonth() + 1);
+  $("fYear").value = p && p.y ? p.y : "";
+  $("fNote").value = p ? p.note || "" : "";
+  $("fErr").textContent = "";
+  $("editExtras").hidden = !p;
+  $("calOne").textContent = p && p.cal ? "Add reminder to Calendar again" : "Add reminder to Calendar";
+  $("confirmDel").hidden = true;
+  showSheet("edit");
+  if (!p) $("fName").focus();
+}
+
+function readForm() {
+  const name = $("fName").value.trim();
+  const d = parseInt($("fDay").value, 10);
+  const yRaw = $("fYear").value.trim();
+  const y = yRaw ? parseInt(yRaw, 10) : null;
+  const thisYear = new Date().getFullYear();
+  if (!name) return { error: "Add a name." };
+  if (!d || d < 1 || d > DAYS_IN[month - 1]) return { error: `${MONTHS[month - 1]} has days 1 to ${DAYS_IN[month - 1]}.` };
+  if (yRaw && (!y || y < 1900 || y > thisYear)) return { error: `Enter a year between 1900 and ${thisYear}, or leave it empty.` };
+  if (y && month === 2 && d === 29 && !isLeap(y)) return { error: `${y} wasn't a leap year, so there was no 29 February.` };
+  return { name, d, m: month, y, note: $("fNote").value.trim() };
+}
+
+$("sheet").addEventListener("submit", (e) => {
+  e.preventDefault();
+  if ($("editBody").hidden) return;
+  const v = readForm();
+  if (v.error) { $("fErr").textContent = v.error; return; }
+  if (editingId) {
+    const old = people.find(p => p.id === editingId);
+    const dateChanged = old && (old.d !== v.d || old.m !== v.m);
+    people = people.map(p => p.id === editingId ? { ...p, ...v, example: false, cal: p.example ? false : (dateChanged ? false : p.cal) } : p);
+    save(); render(); closeSheet();
+    toast(dateChanged && old.cal ? "Saved. The date changed, so add a new reminder and delete the old one in Calendar." : "Saved");
+  } else {
+    people = people.filter(p => !p.example); // first real entry clears the examples
+    const p = { id: uid(), ...v, cal: false };
+    people.push(p);
+    save(); render();
+    editingId = p.id;
+    $("sheetTitle").textContent = "Added";
+    $("addedName").textContent = p.name;
+    showSheet("added");
+  }
+});
+$("cancelBtn").onclick = closeSheet;
+$("scrim").onclick = closeSheet;
+$("addedLater").onclick = closeSheet;
+$("addedCal").onclick = () => { addToCalendar([editingId]); closeSheet(); };
+$("calOne").onclick = () => { addToCalendar([editingId]); closeSheet(); };
+$("delBtn").onclick = () => {
+  const p = people.find(x => x.id === editingId);
+  $("confirmName").textContent = p ? p.name : "";
+  $("editExtras").hidden = true; $("confirmDel").hidden = false;
+};
+$("confirmNo").onclick = () => { $("editExtras").hidden = false; $("confirmDel").hidden = true; };
+$("confirmYes").onclick = () => {
+  const p = people.find(x => x.id === editingId);
+  people = people.filter(x => x.id !== editingId);
+  save(); render(); closeSheet();
+  toast(`Deleted ${p ? p.name : ""}`);
+};
+
+$("addBtn").onclick = () => openEditor();
+$("months").addEventListener("click", (e) => { const r = e.target.closest(".row"); if (r) openEditor(r.dataset.id); });
+$("search").addEventListener("input", render);
+$("clearExamples").onclick = () => { people = real(); save(); render(); };
+$("calMissing").onclick = () => addToCalendar(real().filter(p => !p.cal).map(p => p.id));
+
+/* ---------- calendar (.ics) ---------- */
+function icsEscape(s) { return String(s).replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/([,;])/g, "\\$1"); }
+function fold(line) {
+  // RFC 5545: lines over 75 octets continue on the next line after a space.
+  const enc = new TextEncoder(); const out = []; let cur = "";
+  for (const ch of line) {
+    if (enc.encode(cur + ch).length > 75) { out.push(cur); cur = " " + ch; } else cur += ch;
+  }
+  out.push(cur); return out.join("\r\n");
+}
+const pad = (n) => String(n).padStart(2, "0");
+const ymd = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+function buildICS(list) {
+  const now = new Date();
+  const stamp = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`;
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Birthday Book//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:Birthdays"];
+  for (const p of list) {
+    const startYear = p.y || 2000; // 2000 is a leap year, so 29 Feb is valid
+    const title = `🎂 ${p.name}'s birthday`;
+    const desc = [p.y ? `Born ${p.d} ${MONTHS[p.m - 1]} ${p.y}` : "", p.note || ""].filter(Boolean).join("\n");
+    lines.push(
+      "BEGIN:VEVENT",
+      `UID:birthday-${p.id}@birthday-book`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART;VALUE=DATE:${ymd(new Date(startYear, p.m - 1, p.d))}`,
+      `DTEND;VALUE=DATE:${ymd(new Date(startYear, p.m - 1, p.d + 1))}`,
+      // Last day of February covers 29 Feb in leap years and 28 Feb otherwise.
+      p.m === 2 && p.d === 29 ? "RRULE:FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=-1" : "RRULE:FREQ=YEARLY",
+      `SUMMARY:${icsEscape(title)}`,
+      ...(desc ? [`DESCRIPTION:${icsEscape(desc)}`] : []),
+      "TRANSP:TRANSPARENT",
+      "BEGIN:VALARM",
+      "ACTION:DISPLAY",
+      `DESCRIPTION:${icsEscape(title)}`,
+      "TRIGGER;RELATED=START:PT0S", // all-day events start at 00:00, so the alert fires at midnight
+      "END:VALARM",
+      "END:VEVENT"
+    );
+  }
+  lines.push("END:VCALENDAR");
+  return lines.map(fold).join("\r\n") + "\r\n";
+}
+function addToCalendar(ids) {
+  const list = people.filter(p => ids.includes(p.id) && !p.example);
+  if (!list.length) return;
+  const name = list.length === 1 ? `${list[0].name.replace(/[^\p{L}\p{N} _-]/gu, "").trim() || "Birthday"}.ics` : "Birthdays.ics";
+  saveBlob(new Blob([buildICS(list)], { type: "text/calendar;charset=utf-8" }), name);
+  people = people.map(p => ids.includes(p.id) ? { ...p, cal: true } : p);
+  save(); render();
+}
+function saveBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.rel = "noopener";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+/* ---------- backup ---------- */
+$("exportBtn").onclick = () => {
+  const data = JSON.stringify({ app: "birthday-book", version: 1, exported: new Date().toISOString(), people: real() }, null, 2);
+  saveBlob(new Blob([data], { type: "application/json" }), `birthdays-backup-${ymd(new Date())}.json`);
+};
+$("importFile").addEventListener("change", async (e) => {
+  const file = e.target.files[0]; e.target.value = "";
+  if (!file) return;
+  try {
+    const v = JSON.parse(await file.text());
+    if (!Array.isArray(v.people)) throw new Error();
+    const clean = v.people.filter(p => p && p.name && p.d && p.m).map(p => ({
+      id: String(p.id || uid()), name: String(p.name).slice(0, 80), d: +p.d, m: +p.m,
+      y: p.y ? +p.y : null, note: String(p.note || "").slice(0, 140), cal: !!p.cal,
+    }));
+    const byId = new Map(real().map(p => [p.id, p]));
+    for (const p of clean) byId.set(p.id, p);
+    people = [...byId.values()];
+    save(); render();
+    toast(`Restored ${clean.length} ${clean.length === 1 ? "birthday" : "birthdays"}`);
+  } catch (err) {
+    toast("That file isn't a Birthdays backup.");
+  }
+});
+
+/* ---------- toast, midnight refresh, offline ---------- */
+let toastTimer;
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 3600);
+}
+function scheduleMidnight() {
+  const now = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
+  setTimeout(() => { render(); scheduleMidnight(); }, next - now);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) render(); });
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+
+render();
+scheduleMidnight();
+</script>
+</body>
+</html>
